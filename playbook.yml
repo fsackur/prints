@@ -1,0 +1,14 @@
+---
+# Create LXC container from debian-12-standard_12.7-1_amd64.tar.zst
+
+- name: Print server
+  hosts:
+    - prints
+  remote_user: root
+
+  vars_files:
+    - vars/misc.yml
+
+  roles:
+    - role: prints
+      tags: prints
