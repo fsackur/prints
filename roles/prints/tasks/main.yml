@@ -1,5 +1,39 @@
 ---
-- name: install cups
+- name: install system packages
+  package:
+    name:
+      - sudo
+
+- name: add admin user
+  user:
+    name: prints
+    password: "{{ 'iamfunky' | password_hash('sha512', 'dustysalt') }}"
+    groups:
+      - lpadmin
+    append: true
+
+- name: install print packages
   package:
     name:
       - cups
+      - avahi-daemon
+      - cups-bsd
+      - cups-filters
+      - foomatic-db
+      - foomatic-db-compressed-ppds
+      - printer-driver-gutenprint
+      - printer-driver-hpcups
+      - printer-driver-hpijs
+      - hpijs-ppds
+      - hp-ppd
+      - hplip
+  notify: restart_cups
+
+- name: copy cupsd config
+  copy:
+    src: cupsd.conf
+    dest: /etc/cups/cupsd.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart_cups
