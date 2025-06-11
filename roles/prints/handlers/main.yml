@@ -4,3 +4,13 @@
     name: cups
     enabled: true
     state: restarted
+
+- name: restart_sharing
+  service:
+    name: "{{ item }}"
+    enabled: true
+    state: restarted
+  loop:
+    - smbd
+    - nmbd
+    - avahi-daemon
