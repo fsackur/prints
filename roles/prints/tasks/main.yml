@@ -34,6 +34,14 @@
       - lpadmin
     append: true
 
+- include_tasks: user.yml
+  loop:
+    - root
+    - prints
+  vars:
+    user: "{{ item }}"
+    home: "{{ '/root' if user == 'root' else '/home/' + user }}"
+
 - name: copy cupsd config
   copy:
     src: cupsd.conf
