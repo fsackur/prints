@@ -1,32 +1,42 @@
-# ---
-# - name: install system packages
-#   package:
-#     name:
-#       - sudo
+---
+- name: install system packages
+  package:
+    name:
+      - sudo
+      - python3-passlib
 
-# - name: add admin user
-#   user:
-#     name: prints
-#     password: "{{ 'iamfunky' | password_hash('sha512', 'dustysalt') }}"
-#     groups:
-#       - lpadmin
-#     append: true
+- name: install print packages
+  package:
+    name:
+      - cups
+      - cups-bsd
+      - cups-filters
+      - foomatic-db-engine
+      # - foomatic-db
+      - foomatic-db-compressed-ppds
+      - printer-driver-gutenprint
+      - printer-driver-hpcups
+      - printer-driver-hpijs
+      - hpijs-ppds
+      - hp-ppd
+      - hplip
+  notify: restart_cups
 
-# - name: install print packages
-#   package:
-#     name:
-#       - cups
-#       - cups-bsd
-#       - cups-filters
-#       - foomatic-db
-#       - foomatic-db-compressed-ppds
-#       - printer-driver-gutenprint
-#       - printer-driver-hpcups
-#       - printer-driver-hpijs
-#       - hpijs-ppds
-#       - hp-ppd
-#       - hplip
-#   notify: restart_cups
+- name: add admin user
+  user:
+    name: prints
+    password: "{{ 'iamfunky' | password_hash('sha512', 'dustysalt') }}"
+    groups:
+      - lpadmin
+    append: true
+
+- name: create samba drop-in dir
+  file:
+    path: /etc/samba/printers
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
 
 - name: copy cupsd config
   copy:
@@ -37,12 +47,12 @@
     mode: "0644"
   notify: restart_cups
 
-# - name: install sharing packages
-#   package:
-#     name:
-#       - avahi-daemon
-#       - samba
-#   notify: restart_sharing
+- name: install sharing packages
+  package:
+    name:
+      - avahi-daemon
+      - samba
+  notify: restart_sharing
 
 - name: copy smb config
   copy:
@@ -52,14 +62,6 @@
     group: root
     mode: "0644"
   notify: restart_sharing
-
-- name: create samba drop-in dir
-  file:
-    path: /etc/samba/printers
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
 
 # - name: create spool dirs
 #   file:
