@@ -5,6 +5,7 @@
   hosts:
     - prints
   remote_user: root
+  gather_facts: false
 
   vars_files:
     - vars/misc.yml

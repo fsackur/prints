@@ -5,6 +5,10 @@
       - sudo
       - python3-passlib
 
+- name: enable i386 packages
+  shell:
+    cmd: dpkg --add-architecture i386
+
 - name: install print packages
   package:
     name:
@@ -30,14 +34,6 @@
       - lpadmin
     append: true
 
-- name: create samba drop-in dir
-  file:
-    path: /etc/samba/printers
-    state: directory
-    owner: root
-    group: root
-    mode: "0755"
-
 - name: copy cupsd config
   copy:
     src: cupsd.conf
@@ -52,7 +48,24 @@
     name:
       - avahi-daemon
       - samba
+      - smbclient
   notify: restart_sharing
+
+- name: create samba conf dir
+  file:
+    path: /etc/samba/printers
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: create samba spool dir
+  file:
+    path: /var/spool/samba
+    state: directory
+    owner: root
+    group: lp
+    mode: "1755"
 
 - name: copy smb config
   copy:
@@ -63,28 +76,19 @@
     mode: "0644"
   notify: restart_sharing
 
-# - name: create spool dirs
-#   file:
-#     path: /var/spool/{{ item }}
-#     state: directory
-#     owner: root
-#     group: lp
-#     mode: "1755"
-#   loop:
-#     - samba
-#     - A4
+- name: copy smb config
+  copy:
+    content: "[global]"
+    force: false
+    dest: /etc/samba/printers/printers.conf
+    owner: root
+    group: root
+    mode: "0644"
 
-# - name: copy printer config
-#   copy:
-#     src: A4_printer.conf
-#     dest: /etc/samba/printers/A4_printer.conf
-#     owner: root
-#     group: root
-#     mode: "0644"
-#   notify: restart_sharing
-
-
-
+- include_tasks: add_printer.yml
+  loop: "{{ printers }}"
+  vars:
+    printer: "{{ item }}"
 
 - name: check printer_list.tdb
   stat:

@@ -1,0 +1,98 @@
+---
+- set_fact:
+    p:
+      name: "{{ printer.name }}"
+      desc: "{{ printer.model | default(printer.name) }}"
+      location: "{{ printer.location | default(printer.name | regex_replace('_.*', '')) }}"
+      uri: "{{ printer.uri | default('socket://' + printer.name + '.irl.goingnowhere.org:9100') }}"
+      ppd: "{{ printer.ppd | default(printer.model) }}"
+      driver_uri: "{{ printer.driver_uri }}"
+
+- name: check printers
+  shell:
+    cmd: lpstat -s | grep 'device for '
+  register: lpstat
+  changed_when: false
+  failed_when: lpstat.rc != 0 and lpstat.stderr
+
+- set_fact:
+    installed_printers: "{{
+        lpstat.stdout_lines |
+        map('regex_replace', '^device for ', '') |
+        map('regex_replace', ':.*', '')
+      }}"
+
+- when: p.driver_uri is defined
+  block:
+    - name: download drivers
+      get_url:
+        url: "{{ p.driver_uri }}"
+        dest: "/tmp/{{ p.driver_uri | basename }}"
+      register: print_driver_download
+
+    - name: install drivers
+      shell:
+        cmd: dpkg -i {{ print_driver_download.dest }}
+      register: install_driver
+      changed_when: install_driver.rc == 0
+      failed_when: install_driver.rc != 0 and "is already installed" not in install_driver.stderr
+
+    - name: check printers
+      shell:
+        cmd: lpstat -s | grep 'device for '
+      register: lpstat
+      changed_when: false
+      failed_when: lpstat.rc != 0 and lpstat.stderr
+
+    - set_fact:
+        new_printers: "{{
+            lpstat.stdout_lines |
+            map('regex_replace', '^device for ', '') |
+            map('regex_replace', ':.*', '') |
+            difference(installed_printers)
+          }}"
+
+    - name: remove printers created by installer
+      shell:
+        cmd: lpadmin -x {{ printer_to_remove }}
+      register: remove_vendor_printer
+      changed_when: remove_vendor_printer.rc == 0
+      failed_when: remove_vendor_printer.rc != 0 and "does not exist" not in remove_vendor_printer.stderr
+      loop: "{{ new_printers }}"
+      loop_control:
+        loop_var: printer_to_remove
+
+- name: add printer
+  shell:
+    cmd: |
+      lpstat -v {{ p.name }} || \
+      lpadmin -p '{{ p.name }}' -D '{{ p.desc }}' -L '{{ p.location }}' -E -v '{{ p.uri }}' -m '{{ p.ppd }}'
+  register: add_printer
+  changed_when: not ('device for' in add_printer.stdout)
+
+- name: create spool dir
+  file:
+    path: /var/spool/{{ printer }}
+    state: directory
+    owner: root
+    group: lp
+    mode: "1755"
+
+- name: copy printer config
+  copy:
+    src: "{{ item }}.conf"
+    dest: /etc/samba/printers/{{ printer }}.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart_sharing
+
+- name: include printer config
+  lineinfile:
+    create: true
+    path: "/etc/samba/printers/printers.conf"
+    line: "include = /etc/samba/printers/{{ printer }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart_sharing
